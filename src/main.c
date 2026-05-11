@@ -23,11 +23,16 @@
 //====================================================================
 // GLOBAL CONSTANTS
 //====================================================================
-
+const float K_p = 50.0; // proportional gain
+const float I = 1.0; // integrator constant
+const float T_s = 0.001; // frequency of interrupt is 1 kHz
+const float max_command = 7.0; // maximum voltage allowable
+const float min_command = -7.0; // minimum voltage allowable 
 //====================================================================
 // GLOBAL VARIABLES
 //====================================================================
-
+volatile float u_p = 0.0; // previous control action
+volatile float e_p = 0.0; // current error 
 //====================================================================
 // FUNCTION DECLARATIONS
 //====================================================================
@@ -35,7 +40,8 @@ void init_ADC(void);
 void init_tim3(void);
 void init_tim6(void);
 //void ADC1_COMP_IRQHandler(void);
-void Control_IRQHandler(void);
+void TIM6_IRQHandler(void);
+float PI_control(float command, float feedback);
 //====================================================================
 // MAIN FUNCTION
 //====================================================================
@@ -44,7 +50,9 @@ int main (void)
 {
     init_ADC;
     init_tim3;
-    
+    init_tim6;
+    ADC1->CR |= ADC_CR_ADSTART; 
+
     while (1)
     {
     }
@@ -100,18 +108,39 @@ void init_tim6(void){
     RCC->APB1ENR |= RCC_APB1ENR_TIM6EN; // enable clock for basic timer 6
     TIM6->DIER |= TIM_DIER_UIE; // update interrupt enabled 
     TIM6->PSC = 7;
-    TIM6->ARR = 999; // gives 1 kHz freqeuncy
+    TIM6->ARR = 999; // gives 1 kHz freqeuncy - timer interrupt period is 1 ms
 
     //TIM6->CR1 |= TIM_CR1_OPM; ask about where this is useful
     TIM6->CR1 |= TIM_CR1_CEN; // enable counter 
     NVIC_EnableIRQ(TIM6_IRQn); // Enable interrupt handler
 }
 // END OF init_tim6
+
+float PI_control(float command, float feedback){
+    float error_current = command - feedback; // computes the current error between the command and feedback values
+    float u = (K_p * (((2 + I * T_s) * error_current) + ((I * T_s - 2) * e_p)) + (2 * u_p)) / 2; // difference equation
+
+    if (u > max_command){
+        u = max_command; // avoid saturation? 
+    }
+
+    else if (u < min_command){
+        u = min_command; 
+    }
+    e_p = error_current; 
+    u_p = u; 
+
+    return u;
+}
 //====================================================================
 // INTERRUPT SERVICE ROUTINES
 //====================================================================
 void TIM6_IRQHandler(void){
-
+    if (TIM6->SR & TIM_SR_UIF) { // check flag
+        TIM6->SR &= ~TIM_SR_UIF; // clear flag
+        float position_des = ADC1->DR;
+        float position_act = ADC1->DR;
+        PI_Control(position_des, position_act);
 
 }
 
