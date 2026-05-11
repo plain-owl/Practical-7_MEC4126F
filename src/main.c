@@ -33,6 +33,9 @@
 //====================================================================
 void init_ADC(void);
 void init_tim3(void);
+void init_tim6(void);
+//void ADC1_COMP_IRQHandler(void);
+void Control_IRQHandler(void);
 //====================================================================
 // MAIN FUNCTION
 //====================================================================
@@ -65,8 +68,8 @@ void init_ADC(void){
     ADC1->CFGR1 |= ADC_CFGR1_RES_1; // set ADC resolution to 8 bit, 0.0659 degrees per step approximately (assuming about 270 degrees full rotation of pot)
     ADC1->CFGR1 |= ADC_CFGR1_WAIT;
 
-    ADC1->IER |= ADC_IER_EOCIE; 
-    NVIC_EnableIRQ(ADC1_IRQn); // Enable interrupt handler 
+    //ADC1->IER |= ADC_IER_EOCIE; 
+    //NVIC_EnableIRQ(ADC1_IRQn); // Enable interrupt handler 
     ADC1->CR |= ADC_CR_ADEN; // Set ADEN=1 in ADC_CR register, starts ADC
     while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0); // Wait for ADC to be ready to start converting
 
@@ -92,10 +95,25 @@ void init_tim3(void){
 
 }
 // END OF init_tim3 
+
+void init_tim6(void){
+    RCC->APB1ENR |= RCC_APB1ENR_TIM6EN; // enable clock for basic timer 6
+    TIM6->DIER |= TIM_DIER_UIE; // update interrupt enabled 
+    TIM6->PSC = 7;
+    TIM6->ARR = 999; // gives 1 kHz freqeuncy
+
+    //TIM6->CR1 |= TIM_CR1_OPM; ask about where this is useful
+    TIM6->CR1 |= TIM_CR1_CEN; // enable counter 
+    NVIC_EnableIRQ(TIM6_IRQn); // Enable interrupt handler
+}
+// END OF init_tim6
 //====================================================================
 // INTERRUPT SERVICE ROUTINES
 //====================================================================
+void TIM6_IRQHandler(void){
 
+
+}
 
 //********************************************************************
 // END OF PROGRAM
