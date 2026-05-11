@@ -85,7 +85,7 @@ void init_tim3(void){
 
     TIM3->CCMR1 &= ~ (TIM_CCMR1_CC1S); // set channel 1 to output
     TIM3->CCMR1 |= (TIM_CCMR1_OC1PE); // enable preload 
-    TIM3->CCMR1 |= (TIM_CCMR1_OC1M_1); // set channel 1 to pwm mode 1
+    TIM3->CCMR1 |= (TIM_CCMR1_OC1M_1|TIM_CCMR1_OC1M_2); // set channel 1 to pwm mode 1
     TIM3->CCER |= TIM_CCER_CC1E; // enable channel 1 signal ouput on PB4
     TIM3->CCER &= ~TIM_CCER_CC1P; // channel configured to active high - default
     TIM3->CR1 |= TIM_CR1_CEN; //start timer
