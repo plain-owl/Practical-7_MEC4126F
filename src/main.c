@@ -73,7 +73,7 @@ void init_ADC(void){
     ADC1->CHSELR |= ADC_CHSELR_CHSEL5; // select channel 5, connected to PA5
     ADC1->CHSELR |= ADC_CHSELR_CHSEL6; //select channel 6, connected to PA6
     ADC1->CFGR1 |= ADC_CFGR1_CONT; // set ADC to continuous mode
-    ADC1->CFGR1 |= ADC_CFGR1_RES_1; // set ADC resolution to 8 bit, 0.0659 degrees per step approximately (assuming about 270 degrees full rotation of pot)
+    ADC1->CFGR1 &= ~ADC_CFGR1_RES; // set ADC resolution to 12 bit,  0.088 degrees per step approximately (assuming about 360 degrees full rotation of pot)
     ADC1->CFGR1 |= ADC_CFGR1_WAIT;
 
     //ADC1->IER |= ADC_IER_EOCIE; 
