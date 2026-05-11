@@ -32,7 +32,7 @@ const float min_command = -7.0; // minimum voltage allowable
 // GLOBAL VARIABLES
 //====================================================================
 volatile float u_p = 0.0; // previous control action
-volatile float e_p = 0.0; // current error 
+volatile float e_p = 0.0; // previous error 
 //====================================================================
 // FUNCTION DECLARATIONS
 //====================================================================
@@ -140,8 +140,9 @@ void TIM6_IRQHandler(void){
         TIM6->SR &= ~TIM_SR_UIF; // clear flag
         float position_des = ADC1->DR;
         float position_act = ADC1->DR;
-        PI_Control(position_des, position_act);
-
+        float voltage_req = PI_control(position_des, position_act); // required control action as a voltage 
+        TIM3->CCR1 = (uint16_t)((voltage_req + max_command/(min_command + max_command)) * TIM3->ARR); // converts the output of PI_control to a number between 0 - 1 (duty) then to a value for ccr1 
+        
 }
 
 //********************************************************************
