@@ -39,24 +39,20 @@ volatile float e_p = 0.0; // previous error
 void init_ADC(void);
 void init_tim3(void);
 void init_tim6(void);
-//void ADC1_COMP_IRQHandler(void);
 void TIM6_IRQHandler(void);
 float PI_control(float command, float feedback);
+//void ADC_readings(uint16_t *ch5, uint16_t *ch6);
 //====================================================================
 // MAIN FUNCTION
 //====================================================================
 
 int main (void)
 {
-    init_ADC;
-    init_tim3;
-    init_tim6;
-    ADC1->CR |= ADC_CR_ADSTART; 
+    init_ADC();
+    init_tim3();
+    init_tim6();
 
-    while (1)
-    {
-    }
-
+    while (1);
 }							
 // End of main
 
@@ -71,11 +67,10 @@ void init_ADC(void){
     GPIOA->MODER |= (GPIO_MODER_MODER5|GPIO_MODER_MODER6); // set pins 5 and 6 to analogue mode
 
     ADC1->CHSELR |= (ADC_CHSELR_CHSEL5|ADC_CHSELR_CHSEL6); // select channel 5, connected to PA5 and select channel 6, connected to PA6
-    ADC1->CFGR1 |= ADC_CFGR1_CONT; // set ADC to continuous mode
+    ADC1->CFGR1 &= ~ADC_CFGR1_CONT; // set ADC to single conversion mode
+    ADC1->CFGR1 &= ~ADC_CFGR1_SCANDIR; // set scan direction upwards, so channel 5 read first then channel 6
     ADC1->CFGR1 &= ~ADC_CFGR1_RES; // set ADC resolution to 12 bit,  0.088 degrees per step approximately (assuming about 360 degrees full rotation of pot)
-    ADC1->CFGR1 |= ADC_CFGR1_WAIT;
 
-    //ADC1->IER |= ADC_IER_EOCIE; 
     //NVIC_EnableIRQ(ADC1_IRQn); // Enable interrupt handler 
     ADC1->CR |= ADC_CR_ADEN; // Set ADEN=1 in ADC_CR register, starts ADC
     while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0); // Wait for ADC to be ready to start converting
@@ -83,10 +78,28 @@ void init_ADC(void){
 }
 // END OF init_ADC 
 
+//void ADC_readings(uint16_t *ch5, uint16_t *ch6){
+    // Read channel 5
+    //ADC1->CHSELR = ADC_CHSELR_CHSEL5;
+    //ADC1->CR |= ADC_CR_ADSTART;
+    //while (!(ADC1->ISR & ADC_ISR_EOC));
+    //*ch5 = ADC1->DR;  // 
+    //ADC1->ISR |= ADC_ISR_EOC;  // clear flag after reading channel 5, prepares for next reading 
+    
+    // Read channel 6
+    //ADC1->CHSELR = ADC_CHSELR_CHSEL6;
+    //ADC1->CR |= ADC_CR_ADSTART;
+    //while (!(ADC1->ISR & ADC_ISR_EOC));
+    //*ch6 = ADC1->DR;  // 
+    //ADC1->ISR |= ADC_ISR_EOC; // clear flag after reading channel 6
+//}
+
 void init_tim3(void){
     RCC->AHBENR |= RCC_AHBENR_GPIOBEN; // enable port B clock
+    RCC->APB1ENR |= RCC_APB1ENR_TIM3EN; // enable timer 3 clock
 
     GPIOB->MODER &= ~(GPIO_MODER_MODER4); // reset pin 4 
+    GPIOB->MODER |=  (GPIO_MODER_MODER4_1);  // AF mode
     GPIOB->AFR[0] |= (1 << (4 * 4)); // Set PB4 to alternate function 1
 
     TIM3 ->ARR = 399; 
@@ -112,6 +125,7 @@ void init_tim6(void){
     //TIM6->CR1 |= TIM_CR1_OPM; ask about where this is useful
     TIM6->CR1 |= TIM_CR1_CEN; // enable counter 
     NVIC_EnableIRQ(TIM6_IRQn); // Enable interrupt handler
+    //TIM6->DIER &= ~TIM_DIER_UIE; 
 }
 // END OF init_tim6
 
@@ -131,22 +145,30 @@ float PI_control(float command, float feedback){
 
     return u;
 }
+// END  OF PI_control
+
+
 //====================================================================
 // INTERRUPT SERVICE ROUTINES
 //====================================================================
 void TIM6_IRQHandler(void){
-    if (TIM6->SR & TIM_SR_UIF) { // check flag
-        TIM6->SR &= ~TIM_SR_UIF; // clear flag
+    if (TIM6->SR & TIM_SR_UIF){
+        TIM6->SR &= ~TIM_SR_UIF;   // clear interrupt flag
         uint16_t channel5_reading, channel6_reading; 
-        float position_des, position_act, voltage_req;
-        while (!(ADC1->ISR & ADC_ISR_EOC));
+        float voltage_req;
+        ADC1->CR |= ADC_CR_ADSTART;
+        while (!(ADC1->ISR & ADC_ISR_EOC));   // channel 5 result
         channel5_reading = ADC1->DR;
-        while (!(ADC1->ISR & ADC_ISR_EOC)); // risky because what's the order
+        while (!(ADC1->ISR & ADC_ISR_EOC));   // channel 6 result
         channel6_reading = ADC1->DR;
-        position_des = (channel5_reading / 4096) * 3.3; // converts the ADC value read from channel 5 (PA5) into the control voltage
-        position_act = (channel6_reading / 4096) * 3.3 ; // converts the ADC value read from channel 6 (PA6) into the feedback voltage 
-        voltage_req = PI_control(position_des, position_act); // required control action as a voltage 
-        TIM3->CCR1 = (uint16_t)((voltage_req + max_command/(min_command + max_command)) * TIM3->ARR); // converts the output of PI_control to a number between 0 - 1 (duty) then to a value for ccr1 
+        //position_act = (channel5_reading / 4096.0f) * 3.3; // converts the ADC value read from channel 5 (PA5) into the feedback voltage
+        //position_des = (channel6_reading / 4096.0f) * 3.3 ; // converts the ADC value read from channel 6 (PA6) into the control voltage 
+        voltage_req = PI_control(channel6_reading, channel5_reading); // required control action as a voltage 
+        float duty = 0.5f + (voltage_req / (2.0f * max_command));
+        if (duty > 1.0f) duty = 1.0f;
+        if (duty < 0.0f) duty = 0.0f;
+        TIM3->CCR1 = (uint16_t)(duty * TIM3->ARR); // converts the output of PI_control to a number between 0 - 1 (duty) then to a value for ccr1 
+        
     }
         
 } 
